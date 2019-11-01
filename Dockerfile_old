@@ -1,0 +1,303 @@
+FROM       ubuntu:16.04
+
+MAINTAINER Je-Hoon Song “song.jehoon@gmail.com”
+
+RUN perl -pi.bak -e 's/http:\/\/archive.ubuntu.com/http:\/\/mirror.kakao.com/g' \
+		/etc/apt/sources.list
+
+RUN apt-get update \
+		&& apt-get install -y python3-pip python3-dev \
+		&& cd /usr/local/bin \
+		&& ln -s /usr/bin/python3 python 
+
+RUN apt-get install -y sudo vim git 
+
+RUN apt-get -y install \
+        cmake libcairo2-dev zlib1g-dev \
+        libxml2-dev python-dev gcc make g++
+
+# deps for rdkit
+RUN sed -i 's/# \(.*multiverse$\)/\1/g' /etc/apt/sources.list && \
+		apt-get update && \
+		apt-get -y upgrade && \
+		apt-get install -y build-essential software-properties-common && \
+		apt-get install -y byobu curl git htop man unzip wget && \
+		apt-get install -y \
+		flex \
+		bison \
+		python-numpy \
+		python-dev \
+		sqlite3 \
+		libsqlite3-dev \
+		libboost-dev \
+		libboost-system-dev \
+		libboost-thread-dev \
+		libboost-serialization-dev \
+		libboost-python-dev \
+		libboost-regex-dev && \
+		apt-get clean && rm -rf /var/lib/apt/lists/* 
+
+RUN echo "root:docker" | chpasswd
+
+ENV STANDB_HOME /root
+ENV SCRATCH_DIR ${STANDB_HOME}/scratch
+ENV STANDB_PACKAGE_DIR /usr/local/standb
+ENV OB_BUILD ${SCRATCH_DIR}/openbabel_build
+ENV OB_INSTALL ${STANDB_PACKAGE_DIR}/openbabel
+
+WORKDIR ${STANDB_HOME}/scratch 
+
+#   OpenBabel 
+
+RUN mkdir -p ${OB_BUILD} && mkdir -p ${OB_INSTALL} && mkdir -p ${STANDB_PACKAGE_DIR}
+COPY packages/openbabel-2.4.1.tar.gz ${SCRATCH_DIR}
+# Copy Eigen3 
+COPY packages/3.3.3.tar.gz ${SCRATCH_DIR}
+RUN tar xvfz openbabel-2.4.1.tar.gz 
+RUN tar xvfz 3.3.3.tar.gz
+
+# openbabel configuration for compile 
+RUN cd ${OB_BUILD} && cmake -j30 ${SCRATCH_DIR}/openbabel-2.4.1 \
+	-DCMAKE_INSTALL_PREFIX=${OB_INSTALL} \
+	-DEIGEN3_INCLUDE_DIR=${SCRATCH_DIR}/eigen-eigen-67e894c6cd8f \
+	-DPYTHON_BINDINGS=ON \
+	-DBUILD_GUI=OFF
+
+RUN cd ${OB_BUILD} && make -j30 && make install
+
+#   RDKIT
+
+# Set RDKit version
+ENV RDKIT_VERSION Release_2016_03_3
+
+# # Set environmental variables
+ENV RDBASE ${STANDB_PACKAGE_DIR}/rdkit-$RDKIT_VERSION
+
+WORKDIR ${STANDB_PACKAGE_DIR}
+
+# Compile rdkit
+COPY packages/$RDKIT_VERSION.tar.gz ${STANDB_PACKAGE_DIR}
+
+RUN tar xzvf $RDKIT_VERSION.tar.gz \
+	&& rm -f $RDKIT_VERSION.tar.gz
+
+RUN cd ${RDBASE}/External/INCHI-API \
+	&& ./download-inchi.sh
+
+RUN mkdir -p ${RDBASE}/build
+
+RUN cd ${RDBASE}/build && cmake -DRDK_BUILD_INCHI_SUPPORT=ON .. \
+	&& make -j30 && make install
+
+RUN pip3 install virtualenv 
+RUN pip3 install ipython pytest pandas numpy scipy
+RUN pip3 install ipdb
+RUN pip3 install pympler tqdm xmljson 
+# RUN pip3 install psycopg2 
+RUN pip3 install goatools
+RUN pip3 install cmapPy
+
+#RUN apt-get update \
+#	&& apt-get install python-mysql.connector \
+#	&& pip3 install mysql-connector==2.1.4
+
+ENV PATH /opt/bin:${PATH}
+
+COPY packages/goatools-downloaded-201712.tar.gz . 
+RUN pip3 install scipy
+RUN gzip -d goatools-downloaded-201712.tar.gz && tar xvf goatools-downloaded-201712.tar
+RUN cd goatools && python setup.py install 
+RUN cd .. && rm -rf goatools
+
+RUN apt-get update && apt-get install -y pbzip2
+
+
+RUN rm -rf ${SCRATCH_DIR}
+
+#
+#    SSHD 
+#
+
+RUN apt-get install -y openssh-server
+
+RUN mkdir /var/run/sshd
+
+RUN sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+
+# SSH login fix. Otherwise user is kicked off after login
+RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+
+ENV NOTVISIBLE "in users profile"
+
+RUN echo "export VISIBLE=now" >> /etc/profile
+
+# file ownership
+RUN chown -R root:root ${STANDB_HOME} 
+# WORKDIR ${STANDB_HOME}
+
+RUN /usr/bin/ssh-keygen -A
+
+RUN chsh -s /bin/bash root
+
+WORKDIR ${STANDB_HOME}
+
+# Python Env 
+RUN apt-get update && apt-get install -y build-essential git curl wget bash-completion openssh-server gfortran sudo make \
+    cmake libssl-dev libreadline-dev llvm libsqlite3-dev libmysqlclient-dev python-dev \
+    python3-dev zlib1g-dev libbz2-dev language-pack-ko
+
+COPY packages/vim.tar.gz ${STANDB_HOME}/
+
+RUN cd ${STANDB_HOME} && tar xvfz vim.tar.gz 
+
+RUN cd ${STANDB_HOME}/vim && ./configure --with-features=huge \
+		--enable-multibyte \
+		--enable-rubyinterp \
+		--enable-pythoninterp=dynamic \
+		--with-python-config-dir=/usr/lib/python2.7/config-x86_64-linux-gnu \
+		--enable-python3interp=dynamic \
+		--with-python3-config-dir=/usr/lib/python3.5/config-3.5m-x86_64-linux-gnu \
+		--disable-gui --enable-cscope --prefix=/usr
+
+RUN cd ${STANDB_HOME}/vim && make -j30 VIMRUNTIMEDIR=/usr/share/vim/vim74 && make -j30 install
+
+WORKDIR ${STANDB_HOME}
+
+RUN cd ${STANDB_HOME} && rm -rf vim
+
+
+RUN apt-get install -y net-tools 
+
+# notebook 
+RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py 
+RUN python3 get-pip.py --force-reinstal
+RUN rm -f get-pip.py
+
+RUN pip3 install jupyter 
+
+#USER root 
+RUN mkdir -p -m 700 ${STANDB_HOME}/.jupyter/ && \
+    echo "c.NotebookApp.ip='*'" > ${STANDB_HOME}/.jupyter/jupyter_notebook_config.py
+
+RUN pip3 install jupyterthemes
+RUN pip3 install --upgrade jupyterthemes
+RUN pip3 install matplotlib-venn sympy sklearn 
+
+# install neo4j 
+
+# Install JAVA
+RUN apt-get update && \
+    apt-get install -y openjdk-8-jdk && \
+    apt-get install -y ant && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /var/cache/oracle-jdk8-installer;
+# Fix certificate issues, found as of 
+# https://bugs.launchpad.net/ubuntu/+source/ca-certificates-java/+bug/983302
+RUN apt-get update && \
+    apt-get install -y ca-certificates-java && \
+    apt-get clean && \
+    update-ca-certificates -f && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /var/cache/oracle-jdk8-installer;
+ENV JAVA_HOME /usr/lib/jvm/java-8-openjdk-amd64/
+RUN export JAVA_HOME
+RUN apt-get update && apt-get install -y bash curl
+ENV NEO4J_SHA256=cc2fda6ededfc4678d1fc9be9dc1c5c2902fe2bc184125b59ae6f9183a98571c \
+    NEO4J_TARBALL=neo4j-community-3.3.4-unix.tar.gz \
+    NEO4J_EDITION=community
+ARG NEO4J_URI=http://dist.neo4j.org/neo4j-community-3.3.4-unix.tar.gz
+RUN curl --fail --silent --show-error --location --remote-name ${NEO4J_URI} \
+    && echo "${NEO4J_SHA256}  ${NEO4J_TARBALL}" | sha256sum -cw - \
+    && tar --extract --file ${NEO4J_TARBALL} --directory /var/lib \
+    && mv /var/lib/neo4j-* /var/lib/neo4j \
+    && rm ${NEO4J_TARBALL} \
+    && mv /var/lib/neo4j/data /data \
+    && ln -s /data /var/lib/neo4j/data
+
+ENV PATH /var/lib/neo4j/bin:$PATH
+
+RUN apt-get update && apt-get install -y python3-tk
+
+# Cleaning ... 
+# file ownership
+RUN cd ${STANDB_HOME} && rm -rf vim.tar.gz
+
+ENV COMMON_SCRATCH_DIR="$STANDB_HOME/.scratch"
+ENV STANDB_DATASETS_BASE="http://192.168.0.89/share/StandigmDB/datasets"
+
+# setup env 
+ENV LC_ALL=C
+ENV LD_LIBRARY_PATH ${RDBASE}/lib:${LD_LIBRARY_PATH}
+ENV PYTHONPATH ${OB_INSTALL}/lib:${OB_INSTALL}/lib/python3.5/site-packages:${RDBASE}:${PYTHONPATH}:/usr/local/lib/python3.5/dist-packages
+ENV PATH ${OB_INSTALL}/bin:${PATH}
+ENV PYTHONIOENCODING utf-8
+ENV PATH=$PATH:/root/share/standbr/standb-dwpc
+
+# Test installation: 
+RUN python -c "import openbabel; import pybel; import rdkit"
+
+RUN pip3 install seaborn
+RUN pip3 install git+https://github.com/technige/py2neo.git#egg=py2neo 
+RUN pip3 install tables 
+RUN pip3 install cellbell
+RUN pip3 install -U chembl_webresource_client
+
+#RUN apt-get update && \
+#	apt-get -y install python3-pip --reinstall
+RUN apt-get update && \
+	apt-get install -y python-pydot python-pydot-ng graphviz 
+RUN apt-get -y install nodejs npm
+
+RUN pip install --upgrade pip 
+RUN pip3 uninstall -y Jinja2
+RUN pip3 install --upgrade jupyter
+RUN pip3 install --upgrade --user nbconvert
+RUN pip3 install jupyter-contrib-nbextensions
+RUN pip3 install papermill
+
+RUN pip3 install jupyterlab
+RUN jupyter serverextension enable --py jupyterlab --sys-prefix
+
+RUN pip3 install xmltodict
+
+# docker inside docker 
+RUN apt-get -y install docker.io
+
+# vim neobundle
+COPY packages/neobundle.sh ${STANDB_HOME}
+RUN cd ${STANDB_HOME} && sh ./neobundle.sh && rm -f ./neobundle.sh 
+
+# supertab
+WORKDIR ${STANDB_HOME}
+COPY packages/supertab.vmb . 
+RUN vim -c 'so %' -c 'q' ${STANDB_HOME}/supertab.vmb && rm -f ${STANDB_HOME}/supertab.vmb
+COPY .vimrc ${STANDB_HOME}/.vimrc
+COPY .vim ${STANDB_HOME}/.vim
+RUN vim +NeoBundleInstall +qall
+
+ENV IMDB_DATASETS_BASE http://192.168.0.89/share/StandigmDB/datasets
+ENV PROFILE ${STANDB_HOME}/.bashrc
+RUN echo "# extra env setting" >> $PROFILE
+RUN echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $PROFILE
+RUN echo "export PYTHONPATH=$PYTHONPATH" >> $PROFILE
+RUN echo "export PATH=$PATH" >> $PROFILE
+RUN echo "export PYTHONIOENCODING=$PYTHONIOENCODING" >> $PROFILE
+RUN echo "export LANG=en_US.UTF-8" >> $PROFILE 
+RUN echo "export LC_ALL=C.UTF-8" >> $PROFILE
+RUN echo "export LANG=C.UTF-8" >> $PROFILE
+RUN echo "export DATASETS_BASE=$DATASETS_BASE" >> $PROFILE
+COPY .bashrc bashrc
+RUN cat bashrc >> $PROFILE
+RUN rm -f bashrc
+
+RUN chown -R root:root ${STANDB_HOME} 
+COPY gitconfig .gitconfig
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+
+WORKDIR /root
+USER root 
+EXPOSE 8888 22
+ENTRYPOINT ["/docker-entrypoint.sh"] 
+CMD ["imdb"]
+
