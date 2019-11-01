@@ -1,5 +1,7 @@
 # jetson-tf1
 
+qemu 설치하기 
+
 ```
 sudo apt-get install -y qemu binfmt-support qemu-user-static
 wget http://archive.ubuntu.com/ubuntu/pool/main/b/binfmt-support/binfmt-support_2.1.8-2_amd64.deb
