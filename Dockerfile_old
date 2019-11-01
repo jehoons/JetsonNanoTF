@@ -299,5 +299,5 @@ WORKDIR /root
 USER root 
 EXPOSE 8888 22
 ENTRYPOINT ["/docker-entrypoint.sh"] 
-CMD ["imdb"]
+CMD ["jetson"]
 

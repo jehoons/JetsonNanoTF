@@ -13,7 +13,8 @@ RUN jupyter lab --generate-config
 # tensorflow-gpu
 RUN pip3 install --pre --no-cache-dir --extra-index-url https://developer.download.nvidia.com/compute/redist/jp/v42 tensorflow-gpu
 RUN pip3 install -U numpy
-CMD [ "bash" ]
+
+CMD [ "jup" ]
 
 # jupyter run with following command:
 # jupyter notebook --port=8888 --no-browser --ip=0.0.0.0 --allow-root
