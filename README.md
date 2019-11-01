@@ -33,7 +33,7 @@ CMD [ "bash" ]
 ```
 podman pull nvcr.io/nvidia/l4t-base:r32.2
 podman build -v /usr/bin/qemu-aarch64-static:/usr/bin/qemu-aarch64-static -t docker.io/jhsong/jetson_tf1:0.1.0 . -f ./Dockerfile
-podman push docker.io/zcw607/jetson:0.1.0
+podman push docker.io/jhsong/jetson_tf1:0.1.0
 ```
 
 도커 허브에 푸시하기 위해서는 먼저 로그인해야 한다. 
