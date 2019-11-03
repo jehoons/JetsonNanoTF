@@ -7,7 +7,6 @@ RUN apt update && apt install -y python3-h5py nodejs npm
 # jupyter 
 RUN pip3 install jupyter jupyterlab
 RUN jupyter labextension install @jupyter-widgets/jupyterlab-manager
-RUN jupyter lab --generate-config
 
 # tensorflow-gpu
 RUN pip3 install --pre --no-cache-dir --extra-index-url \

@@ -1,6 +1,6 @@
 #!/bin/bash 
 IMAGE=docker.io/jhsong/jetsontf:0.1
-CONTAINER=jetson
+CONTAINER=jetsontf
 DOCKER_HOME=/root
 HOST_SCRATCH_DIR=${HOME}/.scratch
 DOCKER_SCRATCH_DIR=${DOCKER_HOME}/.scratch
