@@ -12,7 +12,10 @@ RUN jupyter labextension install @jupyter-widgets/jupyterlab-manager
 RUN pip3 install --pre --no-cache-dir --extra-index-url \
 	https://developer.download.nvidia.com/compute/redist/jp/v42 tensorflow-gpu
 RUN pip3 install -U numpy
-RUN pip3 install pandas 
+RUN pip3 install pandas
+RUN pip3 install pyserial
+RUN apt install -y git 
+RUN apt-get -y install cmake 
 
 # jupyter config 
 USER root

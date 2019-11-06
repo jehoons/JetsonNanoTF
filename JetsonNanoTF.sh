@@ -4,7 +4,9 @@ CONTAINER=jetsontf
 DOCKER_HOME=/root
 HOST_SCRATCH_DIR=${HOME}/.scratch
 DOCKER_SCRATCH_DIR=${DOCKER_HOME}/.scratch
-VOLUMNE_MAPS="-v ${HOST_SCRATCH_DIR}:${DOCKER_SCRATCH_DIR} -v `pwd`/share:${DOCKER_HOME}/share -v /var/run/docker.sock:/var/run/docker.sock" 
+VOLUMNE_MAPS="-v ${HOST_SCRATCH_DIR}:${DOCKER_SCRATCH_DIR} \
+	-v `pwd`/share:${DOCKER_HOME}/share -v /var/run/docker.sock:/var/run/docker.sock \
+	-v /dev/ttyTHS1:/dev/ttyTHS1 -v /dev/ttyTHS2:/dev/ttyTHS2"
 # VOLUMNE_MAPS="-v ${HOST_SCRATCH_DIR}:${DOCKER_SCRATCH_DIR} -v /var/run/docker.sock:/var/run/docker.sock" 
 ENVVARS="-e HOST_USER=${ME}"
 PORT_MAPS=-P 
@@ -19,7 +21,7 @@ build(){
 
 start(){
     mkdir -p ${HOST_SCRATCH_DIR}
-    docker run --runtime nvidia --network host -it --rm \
+    docker run --privileged --runtime nvidia --network host -it --rm \
 	    --name ${CONTAINER} ${ENVVARS} ${PORT_MAPS} ${VOLUMNE_MAPS} ${IMAGE} 
 }
 
